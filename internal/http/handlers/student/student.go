@@ -72,3 +72,70 @@ func GetById(storage storage.Storage) http.HandlerFunc {
 
 	}
 }
+
+func GetStudents(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("Getting all students")
+		students, err := storage.GetStudents()
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, err)
+			return
+		}
+		response.WriteJSON(w, http.StatusOK, students)
+	}
+}
+
+func DeleteById(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		idInt, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			response.WriteJSON(w, http.StatusBadRequest, err)
+			return
+		}
+		slog.Info("Deleting student with", slog.String("ID", fmt.Sprint(idInt)))
+
+		err = storage.DeleteById(idInt)
+
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+		response.WriteJSON(w, http.StatusNoContent, nil)
+	}
+}
+
+func UpdateStudent(storage storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		idStr := r.PathValue("id")
+		idInt, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			response.WriteJSON(w, http.StatusBadRequest, err)
+			return
+		}
+		var student types.Student
+		err = json.NewDecoder(r.Body).Decode(&student)
+		if errors.Is(err, io.EOF) {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty payload")))
+			return
+		}
+		if err != nil {
+			response.WriteJSON(w, http.StatusBadRequest, response.GeneralError(err))
+			return
+		}
+
+		//request validation
+		if err := validator.New().Struct(student); err != nil {
+			validationErrs := err.(validator.ValidationErrors)
+			response.WriteJSON(w, http.StatusBadRequest, response.ValidationError(validationErrs))
+			return
+		}
+		err = storage.UpdateStudent(idInt, student.Name, student.Email, int64(student.Age))
+		if err != nil {
+			response.WriteJSON(w, http.StatusInternalServerError, response.GeneralError(err))
+			return
+		}
+
+		response.WriteJSON(w, http.StatusNoContent, nil)
+	}
+}

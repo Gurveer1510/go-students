@@ -73,3 +73,69 @@ func (s *Sqlite) GetStudentById(id int64) (types.Student, error) {
 	}
 	return student, nil
 }
+
+func (s *Sqlite) GetStudents() ([]types.Student, error) {
+	stmt, err := s.Db.Prepare("SELECT id, name, email, age FROM students")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var students []types.Student
+
+	for rows.Next() {
+		var student types.Student
+		err := rows.Scan(&student.Id, &student.Name, &student.Email, &student.Age)
+		if err != nil {
+			return nil, err
+		}
+		students = append(students, student)
+	}
+
+	return students, nil
+}
+
+func (s *Sqlite) DeleteById(id int64) error {
+	stmt, err := s.Db.Prepare(`DELETE FROM students WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(id)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("no record found for the id %v", id)
+	}
+	return err
+}
+
+func (s *Sqlite) UpdateStudent(id int64, name, email string, age int64) error {
+	stmt, err := s.Db.Prepare(`UPDATE students SET name = ?, age = ?, email = ? WHERE id = ? `)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(name, age, email, id)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return fmt.Errorf("no record found for the id %v", id)
+	}
+	return nil
+}
