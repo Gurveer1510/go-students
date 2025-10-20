@@ -11,18 +11,25 @@ import (
 	"time"
 
 	"github.com/Gurveer1510/student-api/internal/config"
+	"github.com/Gurveer1510/student-api/internal/http/handlers/student"
+	"github.com/Gurveer1510/student-api/internal/storage/sqlite"
 )
 
 func main() {
 	// Load config
 	cfg := config.MustLoad()
 	// database setup
+	storage, err := sqlite.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	slog.Info("storage initialiazed", slog.String("env",cfg.Env))
 	// setup router
 	router := http.NewServeMux()
 
-	router.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request){
-		w.Write([]byte("Hello from the student-server"))
-	})
+	router.HandleFunc("POST /api/students", student.New(storage))
+	router.HandleFunc("GET /api/students/{id}", student.GetById(storage))
 	// setup server
 	server := http.Server {
 		Addr: cfg.Addr,
@@ -47,7 +54,7 @@ func main() {
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 10 * time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctxWithTimeout)
+	err = server.Shutdown(ctxWithTimeout)
 	if err != nil {
 		slog.Error("Failed to shutdown the server", slog.String("error", err.Error()))
 	}
